@@ -1,3 +1,7 @@
+# Forked Populate Module
+This module is forked to add additional bespoke functionality for a migration project at signify
+
+
 # Populate Module
 
 [![Build Status](https://secure.travis-ci.org/dnadesign/silverstripe-populate.png?branch=master)](http://travis-ci.org/dnadesign/silverstripe-populate)
