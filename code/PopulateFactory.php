@@ -20,43 +20,43 @@ use SilverStripe\Versioned\Versioned;
  */
 class PopulateFactory extends FixtureFactory {
 
-	/**
-	 * Creates the object in the database as the original object will be wiped.
-	 *
-	 * @param string $class
-	 * @param string $identifier
-	 * @param array $data
-	 */
-	public function createObject($class, $identifier, $data = null) {
-		DB::alteration_message("Creating $identifier ($class)", "created");
+    /**
+     * Creates the object in the database as the original object will be wiped.
+     *
+     * @param string $class
+     * @param string $identifier
+     * @param array $data
+     */
+    public function createObject($class, $identifier, $data = null) {
+        DB::alteration_message("Creating $identifier ($class)", "created");
+        $file = null;
+        if($data) {
+            foreach($data as $k => $v) {
+                if(!(is_array($v)) && preg_match('/^`(.)*`;$/', $v)) {
+                    $str = substr($v, 1, -2);
+                    $pv = null;
 
-		if($data) {
-			foreach($data as $k => $v) {
-				if(!(is_array($v)) && preg_match('/^`(.)*`;$/', $v)) {
-					$str = substr($v, 1, -2);
-					$pv = null;
+                    eval("\$pv = $str;");
 
-					eval("\$pv = $str;");
+                    $data[$k] =	$pv;
+                }
+            }
+        }
 
-					$data[$k] =	$pv;
-				}
-			}
-		}
-
-		// for files copy the source dir if the image has a 'PopulateFileFrom'
+        // for files copy the source dir if the image has a 'PopulateFileFrom'
         // Follows silverstripe/asset-admin logic, see AssetAdmin::apiCreateFile()
-		if(isset($data['PopulateFileFrom'])) {
-			if(!isset($data['Filename'])) {
-			    throw new \Exception('When passing "PopulateFileFrom", you must also pass "Filename" with the path that you want to file to be stored at (e.g. assets/test.jpg)');
+        if(isset($data['PopulateFileFrom'])) {
+            if(!isset($data['Filename'])) {
+                throw new \Exception('When passing "PopulateFileFrom", you must also pass "Filename" with the path that you want to file to be stored at (e.g. assets/test.jpg)');
             }
 
-		    $fixtureFilePath = BASE_PATH . '/'. $data['PopulateFileFrom'];
+            $fixtureFilePath = BASE_PATH . '/'. $data['PopulateFileFrom'];
             $upload = Upload::create();
             $upload->setReplaceFile(true);
 
-		    $folder = Folder::find_or_make(
-				str_replace('assets/', '', dirname($data['Filename']))
-			);
+            $folder = Folder::find_or_make(
+                str_replace('assets/', '', dirname($data['Filename']))
+            );
 
             $info = new \finfo(FILEINFO_MIME_TYPE);
 
@@ -89,100 +89,111 @@ class PopulateFactory extends FixtureFactory {
 
             $file->ParentID = $folder->ID;
             $f = $file->toMap();
-
+            $file->doPublish();
             if ($file->exists()) {
                 $data['FileHash'] = $f['File']->Hash;
                 $data['FileFilename'] = $f['File']->Filename;
-                $data['ParentID'] = $f['File']->ParentID;
+                //$data['ParentID'] = $f['File']->ParentID;
             }
 
-		}
 
-		// if any merge labels are defined then we should create the object
-		// from that
-		$lookup = null;
-		$mode = null;
+        }
 
-		if(isset($data['PopulateMergeWhen'])) {
-			$mode = 'PopulateMergeWhen';
+        // if any merge labels are defined then we should create the object
+        // from that
+        $lookup = null;
+        $mode = null;
 
-			$lookup = DataList::create($class)->where(
-				$data['PopulateMergeWhen']
-			);
+        if(isset($data['PopulateMergeWhen'])) {
+            $mode = 'PopulateMergeWhen';
 
-			unset($data['PopulateMergeWhen']);
+            $lookup = DataList::create($class)->where(
+                $data['PopulateMergeWhen']
+            );
 
-		} else if(isset($data['PopulateMergeMatch'])) {
-			$mode = 'PopulateMergeMatch';
-			$filter = array();
+            unset($data['PopulateMergeWhen']);
 
-			foreach($data['PopulateMergeMatch'] as $field) {
-				$filter[$field] = $data[$field];
-			}
+        } else if(isset($data['PopulateMergeMatch'])) {
+            $mode = 'PopulateMergeMatch';
+            $filter = array();
 
-			if(!$filter) {
-				throw new \Exception('Not a valid PopulateMergeMatch filter');
-			}
+            foreach($data['PopulateMergeMatch'] as $field) {
+                $filter[$field] = $data[$field];
+            }
 
-			$lookup = DataList::create($class)->filter($filter);
+            if(!$filter) {
+                throw new \Exception('Not a valid PopulateMergeMatch filter');
+            }
 
-			unset($data['PopulateMergeMatch']);
-		} else if(isset($data['PopulateMergeAny'])) {
-			$mode = 'PopulateMergeAny';
-			$lookup = DataList::create($class);
+            $lookup = DataList::create($class)->filter($filter);
 
-			unset($data['PopulateMergeAny']);
-		}
+            unset($data['PopulateMergeMatch']);
+        } else if(isset($data['PopulateMergeAny'])) {
+            $mode = 'PopulateMergeAny';
+            $lookup = DataList::create($class);
 
-		if($lookup && $lookup->count() > 0) {
-			$existing = $lookup->first();
+            unset($data['PopulateMergeAny']);
+        }
 
-			foreach($lookup as $old) {
-				if($old->ID == $existing->ID) {
-					continue;
-				}
+        if($lookup && $lookup->count() > 0) {
+            $existing = $lookup->first();
 
-				if($old->hasExtension(Versioned::class)) {
-					foreach($old->getVersionedStages() as $stage) {
-						$old->deleteFromStage($stage);
-					}
-				}
+            foreach($lookup as $old) {
+                if($old->ID == $existing->ID) {
+                    continue;
+                }
 
-				$old->delete();
-			}
+                if($old->hasExtension(Versioned::class)) {
+                    foreach($old->getVersionedStages() as $stage) {
+                        $old->deleteFromStage($stage);
+                    }
+                }
 
-			$blueprint = new FixtureBlueprint($class);
-			$obj = $blueprint->createObject($identifier, $data, $this->fixtures);
-			$latest = $obj->toMap();
+                $old->delete();
+            }
 
-			unset($latest['ID']);
+            $blueprint = new FixtureBlueprint($class);
+            $obj = $blueprint->createObject($identifier, $data, $this->fixtures);
+            $latest = $obj->toMap();
 
-			$existing->update($latest);
-			$existing->write();
+            unset($latest['ID']);
 
-			$obj->delete();
+            $existing->update($latest);
+            $existing->write();
 
-			$this->fixtures[$class][$identifier] = $existing->ID;
+            $obj->delete();
 
-			$obj = $existing;
-			$obj->flushCache();
-		}
-		else {
-			$obj = parent::createObject($class, $identifier, $data);
-		}
+            $this->fixtures[$class][$identifier] = $existing->ID;
 
-		if($obj->hasExtension(Versioned::class)) {
-			foreach($obj->getVersionedStages() as $stage) {
-				if($stage !== Versioned::DRAFT) {
+            $obj = $existing;
+            $obj->flushCache();
+        }
+        else {
 
-					$obj->writeToStage(Versioned::DRAFT);
-					$obj->publish(Versioned::DRAFT, $stage);
-				}
-			}
 
-			$obj->flushCache();
-		}
+            if($file){
+                $data = $file->toMap();
+            }
+            $obj = parent::createObject($class, $identifier, $data);
 
-		return $obj;
-	}
+            if($file){
+                $obj->PreviewLink();
+                $obj->updateFileSystem();
+            }
+        }
+
+        if($obj->hasExtension(Versioned::class)) {
+            foreach($obj->getVersionedStages() as $stage) {
+                if($stage !== Versioned::DRAFT) {
+
+                    $obj->writeToStage(Versioned::DRAFT);
+                    $obj->publish(Versioned::DRAFT, $stage);
+                }
+            }
+
+            $obj->flushCache();
+        }
+
+        return $obj;
+    }
 }
