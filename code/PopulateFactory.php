@@ -14,6 +14,8 @@ use SilverStripe\Dev\FixtureFactory;
 use SilverStripe\ORM\DataList;
 use SilverStripe\ORM\DB;
 use SilverStripe\Versioned\Versioned;
+use Psr\Log\LoggerInterface;
+
 
 /**
  * @package populate
@@ -89,7 +91,21 @@ class PopulateFactory extends FixtureFactory {
 
             $file->ParentID = $folder->ID;
             $f = $file->toMap();
-            $file->doPublish();
+            //$file->doPublish();
+
+            if($file->hasExtension(Versioned::class)) {
+                foreach($file->getVersionedStages() as $stage) {
+                    if($stage !== Versioned::DRAFT) {
+
+                        $file->writeToStage(Versioned::DRAFT);
+                        $file->publish(Versioned::DRAFT, $stage);
+                    }
+                }
+
+                $file->flushCache();
+
+            }
+
             if ($file->exists()) {
                 $data['FileHash'] = $f['File']->Hash;
                 $data['FileFilename'] = $f['File']->Filename;
@@ -154,6 +170,7 @@ class PopulateFactory extends FixtureFactory {
 
             $blueprint = new FixtureBlueprint($class);
             $obj = $blueprint->createObject($identifier, $data, $this->fixtures);
+
             $latest = $obj->toMap();
 
             unset($latest['ID']);
@@ -192,8 +209,10 @@ class PopulateFactory extends FixtureFactory {
             }
 
             $obj->flushCache();
-        }
 
+        }
+        Injector::inst()->get(LoggerInterface::class)->error('Completed: ' . $identifier . " -  " . $obj->Title);
         return $obj;
     }
+
 }
