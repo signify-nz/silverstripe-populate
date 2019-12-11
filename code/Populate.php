@@ -99,15 +99,35 @@ class Populate
             self::truncate_table($objName);
         }
 
+        $totalStartTime = microtime(true);
         $count = 0;
         foreach(self::config()->get('include_yaml_fixtures') as $fixtureFile) {
+            DB::alteration_message("Consuming: " . $fixtureFile , "created");
+            $startTime = microtime(true);
             $fixture = new YamlFixture($fixtureFile);
             $count += 1;
             Injector::inst()->get(LoggerInterface::class)->error($count);
             $fixture->writeInto($factory);
-
             $fixture = null;
+
+            $endTime = microtime(true);
+            $diff = round($endTime - $startTime);
+            $minutes = floor($diff / 60); //only minutes
+            $seconds = $diff % 60;//remaining seconds, using modulo operator
+            $msg = "$minutes:$seconds";
+            DB::alteration_message($msg , "created");
+            DB::alteration_message('' , "created");
         }
+
+        $totalEndTime = microtime(true);
+
+        $diff = round($totalEndTime - $totalStartTime);
+        $minutes = floor($diff / 60); //only minutes
+        $seconds = $diff % 60;//remaining seconds, using modulo operator
+        $msg = "Total import time: $minutes:$seconds";
+        DB::alteration_message($msg , "created");
+        DB::alteration_message('' , "created");
+
 
         // hook allowing extensions to clean up records, modify the result or
         // export the data to a SQL file (for importing performance).

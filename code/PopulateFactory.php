@@ -30,7 +30,7 @@ class PopulateFactory extends FixtureFactory {
      * @param array $data
      */
     public function createObject($class, $identifier, $data = null) {
-        DB::alteration_message("Creating $identifier ($class)", "created");
+        #DB::alteration_message("Creating $identifier ($class)", "created");
         $file = null;
         if($data) {
             foreach($data as $k => $v) {
@@ -94,16 +94,9 @@ class PopulateFactory extends FixtureFactory {
             //$file->doPublish();
 
             if($file->hasExtension(Versioned::class)) {
-                foreach($file->getVersionedStages() as $stage) {
-                    if($stage !== Versioned::DRAFT) {
-
-                        $file->writeToStage(Versioned::DRAFT);
-                        $file->publish(Versioned::DRAFT, $stage);
-                    }
-                }
-
+                $file->publishRecursive();
+                $file->writeToStage(Versioned::LIVE);
                 $file->flushCache();
-
             }
 
             if ($file->exists()) {
@@ -200,14 +193,8 @@ class PopulateFactory extends FixtureFactory {
         }
 
         if($obj->hasExtension(Versioned::class)) {
-            foreach($obj->getVersionedStages() as $stage) {
-                if($stage !== Versioned::DRAFT) {
-
-                    $obj->writeToStage(Versioned::DRAFT);
-                    $obj->publish(Versioned::DRAFT, $stage);
-                }
-            }
-
+            $obj->publishRecursive();
+            $obj->writeToStage(Versioned::LIVE);
             $obj->flushCache();
 
         }
